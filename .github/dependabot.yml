@@ -4,7 +4,8 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
       time: "04:00"
       timezone: "UTC"
     target-branch: "main"
@@ -17,3 +18,28 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # Root Monorepo TypeScript & Action dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    target-branch: "main"
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      tooling:
+        patterns:
+          - "typescript*"
+          - "tsup*"
+          - "@types/*"
+          - "prettier*"
+      actions:
+        patterns:
+          - "@actions/*"
