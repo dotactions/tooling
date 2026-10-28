@@ -117,6 +117,7 @@ permissions:
 | `severity`         | Comma-separated severity levels to include | No       | `"CRITICAL,HIGH,MEDIUM"` |
 | `fail-on-findings` | Fail the workflow if findings are detected | No       | `false`                  |
 | `upload-artifact`  | Upload SARIF scan report as a job artifact | No       | `true`                   |
+| `manage-issue`     | Create/update/close tracked GitHub issue   | No       | `false`                  |
 
 #### Secrets
 
@@ -133,14 +134,19 @@ name: Security Audit
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
   schedule:
-    - cron: "0 4 * * 4" # Weekly Thursday at 04:00 UTC
+    - cron: "0 4 * * 4" # weekly Thursday at 04:00 UTC
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   audit:
@@ -152,5 +158,5 @@ jobs:
     with:
       severity: "CRITICAL,HIGH"
       fail-on-findings: true
-
+      manage-issue: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
 ```
