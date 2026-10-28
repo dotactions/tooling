@@ -95,3 +95,62 @@ permissions:
 ```
 
 ## Workflows
+
+### Trivy Security Audit (`trivy-audit.yml`)
+
+Runs Trivy vulnerability and misconfiguration scanning on the caller repository, parses findings, publishes sticky PR comments / job summaries via `security-report`, and optionally uploads SARIF artifacts.
+
+#### Permissions Required
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write # for sticky PR comments
+  issues: write # for automated issue management
+```
+
+#### Inputs
+
+| Name               | Description                                | Required | Default                  |
+| :----------------- | :----------------------------------------- | :------- | :----------------------- |
+| `scan-type`        | Trivy scan target type (e.g. `fs`)         | No       | `"fs"`                   |
+| `severity`         | Comma-separated severity levels to include | No       | `"CRITICAL,HIGH,MEDIUM"` |
+| `fail-on-findings` | Fail the workflow if findings are detected | No       | `false`                  |
+| `upload-artifact`  | Upload SARIF scan report as a job artifact | No       | `true`                   |
+
+#### Secrets
+
+| Name    | Description                                                  | Required |
+| :------ | :----------------------------------------------------------- | :------- |
+| `token` | GitHub token with pull-requests and issues write permissions | No       |
+
+#### Usage
+
+```yaml
+# .github/workflows/security.yml
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * 4" # Weekly Thursday at 04:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    uses: dotsem/actions/.github/workflows/trivy-audit.yml@v0
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      severity: "CRITICAL,HIGH"
+      fail-on-findings: true
+
+```
