@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
       time: "04:00"
       timezone: "UTC"
     target-branch: "main"
