@@ -20,7 +20,7 @@ Configures PNPM, sets up the Node.js runtime, restores cached dependencies, and 
 #### Usage
 
 ```yaml
-- uses: dotsem/actions/setup-node@main
+- uses: dotsem/actions/setup-node@v0
   with:
       node-version: "22"
       working-directory: "frontend"
@@ -41,7 +41,7 @@ Runs a production build command using PNPM in the specified directory.
 #### Usage
 
 ```yaml
-- uses: dotsem/actions/build-node@main
+- uses: dotsem/actions/build-node@v0
   with:
       working-directory: "frontend"
       script: "build"
@@ -85,7 +85,7 @@ permissions:
 
 ```yaml
 - name: Report Trivy Results
-  uses: dotsem/actions/security-report@main
+  uses: dotsem/actions/security-report@v0
   if: always() && hashFiles('trivy.sarif') != ''
   with:
       title: "Trivy Vulnerability Report"
