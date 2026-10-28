@@ -94,6 +94,41 @@ permissions:
       fail-on-findings: "true"
 ```
 
+### Build Flutter (`build-flutter`)
+
+Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, installs target dependencies, builds release binaries, and packages artifacts for Linux, macOS, Windows, Android (APK/AAB), or iOS.
+
+> **Prerequisite**: Run `actions/checkout` before calling this action.
+
+#### Inputs
+
+| Name                | Description                                                       | Required | Default    |
+| :------------------ | :---------------------------------------------------------------- | :------- | :--------- |
+| `target`            | Target platform: `linux`, `macos`, `windows`, `android`, or `ios` | Yes      | -          |
+| `flutter-version`   | Target Flutter SDK version                                        | No       | `"3.47.1"` |
+| `channel`           | Flutter release channel                                           | No       | `"stable"` |
+| `cache`             | Cache Flutter SDK artifacts                                       | No       | `"true"`   |
+| `working-directory` | Directory containing `pubspec.yaml`                               | No       | `"."`      |
+| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)  | No       | `"apk"`    |
+
+*Note: Selecting 'both' will upload both APK & AAB as individual release assets.*
+
+#### Outputs
+
+| Name            | Description                                   |
+| :-------------- | :-------------------------------------------- |
+| `artifact-name` | Base name for the generated artifact          |
+| `artifact-path` | Path glob pointing to the packaged archive(s) |
+
+#### Usage
+
+```yaml
+- name: Build Flutter App
+  uses: dotsem/actions/build-flutter@v0
+  with:
+      target: "linux"
+```
+
 ## Workflows
 
 ### Trivy Security Audit (`trivy-audit.yml`)
@@ -104,9 +139,9 @@ Runs Trivy vulnerability and misconfiguration scanning on the caller repository,
 
 ```yaml
 permissions:
-  contents: read
-  pull-requests: write # for sticky PR comments
-  issues: write # for automated issue management
+    contents: read
+    pull-requests: write # for sticky PR comments
+    issues: write # for automated issue management
 ```
 
 #### Inputs
@@ -132,31 +167,131 @@ permissions:
 name: Security Audit
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "**.md"
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - "**.md"
-  schedule:
-    - cron: "0 4 * * 4" # weekly Thursday at 04:00 UTC
-  workflow_dispatch:
+    push:
+        branches: [main]
+        paths-ignore:
+            - "**.md"
+    pull_request:
+        branches: [main]
+        paths-ignore:
+            - "**.md"
+    schedule:
+        - cron: "0 4 * * 4" # weekly Thursday at 04:00 UTC
+    workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  audit:
-    uses: dotsem/actions/.github/workflows/trivy-audit.yml@v0
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    with:
-      severity: "CRITICAL,HIGH"
-      fail-on-findings: true
-      manage-issue: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    audit:
+        uses: dotsem/actions/.github/workflows/trivy-audit.yml@v0
+        permissions:
+            contents: read
+            pull-requests: write
+            issues: write
+        with:
+            severity: "CRITICAL,HIGH"
+            fail-on-findings: true
+            manage-issue: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+```
+
+### Flutter CI (`flutter-ci.yml`)
+
+Runs Flutter static analysis, unit tests, and cross-platform compilation across a specified list of targets.
+
+#### Inputs
+
+| Name                | Description                                                          | Required | Default    |
+| :------------------ | :------------------------------------------------------------------- | :------- | :--------- |
+| `pr-targets`        | JSON array of targets to build on pull request (e.g. `'["linux"]'`)  | No*       | `""`       |
+| `push-targets`      | JSON array of targets to build on push (e.g. `'["linux", "macos"]'`) | No*       | `""`       |
+| `targets`           | JSON array of targets to build for all events (overrides above)      | No*       | `""`       |
+| `flutter-version`   | Flutter SDK version                                                  | No       | `"3.47.1"` |
+| `working-directory` | Directory containing `pubspec.yaml`                                  | No       | `"."`      |
+| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)     | No       | `"apk"`    |
+| `concurrency-tests` | Number of concurrent test runners                                    | No       | `4`        |
+
+**You must provide either `targets` or both `pr-targets` and `push-targets`.*
+
+#### Usage
+
+```yaml
+# .github/workflows/ci.yml
+name: CI Pipeline
+
+on:
+    push:
+        branches: [main]
+        paths-ignore: ["**.md"]
+    pull_request:
+        branches: ["**"]
+        paths-ignore: ["**.md"]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    ci:
+        uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0
+        with:
+            pr-targets: '["linux"]'
+            push-targets: '["linux", "windows", "macos"]'
+```
+
+### Flutter CD (`flutter-cd.yml`)
+
+Builds release packages across specified platforms and uploads them directly to a GitHub release.
+
+#### Permissions Required
+
+```yaml
+permissions:
+    contents: write # for uploading release assets
+```
+
+#### Inputs
+
+| Name                | Description                                                      | Required | Default    |
+| :------------------ | :--------------------------------------------------------------- | :------- | :--------- |
+| `targets`           | JSON array of targets to build (e.g. `'["linux", "windows"]'`)   | Yes      | -          |
+| `tag`               | Target release tag (defaults to event tag or ref)                | No       | `""`       |
+| `flutter-version`   | Flutter SDK version                                              | No       | `"3.38.5"` |
+| `working-directory` | Directory containing `pubspec.yaml`                              | No       | `"."`      |
+| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`) | No       | `"apk"`    |
+
+#### Secrets
+
+| Name    | Description                                               | Required |
+| :------ | :-------------------------------------------------------- | :------- |
+| `token` | GitHub token with write access (defaults to GITHUB_TOKEN) | No       |
+
+#### Usage
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Release tag"
+                required: false
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    cd:
+        uses: dotsem/actions/.github/workflows/flutter-cd.yml@v0
+        permissions:
+            contents: write
+        with:
+            targets: '["linux", "windows", "macos", "android"]'
+            tag: ${{ inputs.tag || github.event.release.tag_name }}
 ```
