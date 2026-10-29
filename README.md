@@ -96,7 +96,7 @@ permissions:
 
 ### Build Flutter (`build-flutter`)
 
-Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, installs target dependencies, builds release binaries, and packages artifacts for Linux, macOS, Windows, Android (APK/AAB), or iOS.
+Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, installs target dependencies, builds binaries in release, debug, or profile mode, and packages artifacts for Linux, macOS, Windows, Android (APK/AAB), or iOS.
 
 > **Prerequisite**: Run `actions/checkout` before calling this action.
 
@@ -110,6 +110,7 @@ Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, instal
 | `cache`             | Cache Flutter SDK artifacts                                       | No       | `"true"`   |
 | `working-directory` | Directory containing `pubspec.yaml`                               | No       | `"."`      |
 | `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)  | No       | `"apk"`    |
+| `build-mode`        | Build compilation mode: `debug`, `profile`, or `release`          | No       | `"release"`|
 
 *Note: Selecting 'both' will upload both APK & AAB as individual release assets.*
 
@@ -210,9 +211,14 @@ Runs Flutter static analysis, unit tests, and cross-platform compilation across 
 | `flutter-version`   | Flutter SDK version                                                  | No       | `"3.47.1"` |
 | `working-directory` | Directory containing `pubspec.yaml`                                  | No       | `"."`      |
 | `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)     | No       | `"apk"`    |
+| `build-mode`        | Universal build mode (`debug`, `profile`, `release`) (overrides below)| No       | `""`**        |
+| `pr-build-mode`     | Build mode on pull request (defaults to `"debug"`)                   | No       | `""`**        |
+| `push-build-mode`   | Build mode on push/merge (defaults to `"release"`)                   | No      | `""`**        |
 | `concurrency-tests` | Number of concurrent test runners                                    | No       | `4`        |
 
 **You must provide either `targets` or both `pr-targets` and `push-targets`.*
+
+** *If none are provided. PR build-mode is `"debug"`, push build-mode is `"release"`.*
 
 #### Usage
 
@@ -238,6 +244,13 @@ jobs:
         with:
             pr-targets: '["linux"]'
             push-targets: '["linux", "windows", "macos"]'
+            # or a target for all events:
+            # targets: '["android"]'
+
+            pr-build-mode: 'debug'
+            push-build-mode: 'release'
+            # or a build mode for all events:
+            # build-mode: 'release'
 ```
 
 ### Flutter CD (`flutter-cd.yml`)
@@ -257,7 +270,7 @@ permissions:
 | :------------------ | :--------------------------------------------------------------- | :------- | :--------- |
 | `targets`           | JSON array of targets to build (e.g. `'["linux", "windows"]'`)   | Yes      | -          |
 | `tag`               | Target release tag (defaults to event tag or ref)                | No       | `""`       |
-| `flutter-version`   | Flutter SDK version                                              | No       | `"3.38.5"` |
+| `flutter-version`   | Flutter SDK version                                              | No       | `"3.47.1"` |
 | `working-directory` | Directory containing `pubspec.yaml`                              | No       | `"."`      |
 | `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`) | No       | `"apk"`    |
 
