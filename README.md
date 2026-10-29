@@ -96,7 +96,7 @@ permissions:
 
 ### Build Flutter (`build-flutter`)
 
-Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, installs target dependencies, builds binaries in release, debug, or profile mode, and packages artifacts for Linux, macOS, Windows, Android (APK/AAB), or iOS.
+Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, installs target dependencies, builds binaries in release, debug, or profile mode, and packages artifacts for Linux, macOS, Windows, Android (android-apk/android-aab), or iOS.
 
 > **Prerequisite**: Run `actions/checkout` before calling this action.
 
@@ -104,15 +104,12 @@ Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, instal
 
 | Name                | Description                                                       | Required | Default    |
 | :------------------ | :---------------------------------------------------------------- | :------- | :--------- |
-| `target`            | Target platform: `linux`, `macos`, `windows`, `android`, or `ios` | Yes      | -          |
+| `target`            | Target platform: `linux`, `macos`, `windows`, `android-apk`, `android-aab`, or `ios` | Yes      | -          |
 | `flutter-version`   | Target Flutter SDK version                                        | No       | `"3.47.1"` |
 | `channel`           | Flutter release channel                                           | No       | `"stable"` |
 | `cache`             | Cache Flutter SDK artifacts                                       | No       | `"true"`   |
 | `working-directory` | Directory containing `pubspec.yaml`                               | No       | `"."`      |
-| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)  | No       | `"apk"`    |
 | `build-mode`        | Build compilation mode: `debug`, `profile`, or `release`          | No       | `"release"`|
-
-*Note: Selecting 'both' will upload both APK & AAB as individual release assets.*
 
 #### Outputs
 
@@ -210,7 +207,6 @@ Runs Flutter static analysis, unit tests, and cross-platform compilation across 
 | `targets`           | JSON array of targets to build for all events (overrides above)      | No*       | `""`       |
 | `flutter-version`   | Flutter SDK version                                                  | No       | `"3.47.1"` |
 | `working-directory` | Directory containing `pubspec.yaml`                                  | No       | `"."`      |
-| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`)     | No       | `"apk"`    |
 | `build-mode`        | Universal build mode (`debug`, `profile`, `release`) (overrides below)| No       | `""`**        |
 | `pr-build-mode`     | Build mode on pull request (defaults to `"debug"`)                   | No       | `""`**        |
 | `push-build-mode`   | Build mode on push/merge (defaults to `"release"`)                   | No      | `""`**        |
@@ -242,10 +238,10 @@ jobs:
     ci:
         uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0
         with:
-            pr-targets: '["linux"]'
-            push-targets: '["linux", "windows", "macos"]'
+            pr-targets: '["android-apk"]'
+            push-targets: '["android-aab", "windows"]'
             # or a target for all events:
-            # targets: '["android"]'
+            # targets: '["linux"]'
 
             pr-build-mode: 'debug'
             push-build-mode: 'release'
@@ -272,7 +268,6 @@ permissions:
 | `tag`               | Target release tag (defaults to event tag or ref)                | No       | `""`       |
 | `flutter-version`   | Flutter SDK version                                              | No       | `"3.47.1"` |
 | `working-directory` | Directory containing `pubspec.yaml`                              | No       | `"."`      |
-| `android-format`    | Artifact format when targeting Android (`apk`, `aab`, or `both`) | No       | `"apk"`    |
 
 #### Secrets
 
@@ -305,6 +300,6 @@ jobs:
         permissions:
             contents: write
         with:
-            targets: '["linux", "windows", "macos", "android"]'
+            targets: '["linux", "windows", "macos", "android-aab"]'
             tag: ${{ inputs.tag || github.event.release.tag_name }}
 ```
