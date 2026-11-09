@@ -40,7 +40,7 @@ Configures PNPM, sets up the Node.js runtime, restores cached dependencies, and 
 ```yaml
 - uses: dotsem/actions/setup-node@v0.5
   with:
-      node-version: "22"
+      node-version: "24"
       working-directory: "frontend"
 ```
 
