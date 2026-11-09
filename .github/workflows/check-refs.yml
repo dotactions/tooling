@@ -1,0 +1,37 @@
+name: Check Self-References
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/*.yml"
+      - "**/action.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/*.yml"
+      - "**/action.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-refs-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check-refs:
+    name: Self-references point at @main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check self-references point at @main
+        shell: bash
+        run: |
+          # On main, self-references must be @main; internal-release.yml rewrites them to the release tag.
+          if git grep -nE 'dotsem/actions/[A-Za-z0-9_./-]+@' -- '.github/workflows/*.yml' '*/action.yml' \
+              | grep -vE 'dotsem/actions/[A-Za-z0-9_./-]+@main\b'; then
+            echo "::error::Self-references to dotsem/actions must use @main (release tags are applied by internal-release.yml)"
+            exit 1
+          fi
