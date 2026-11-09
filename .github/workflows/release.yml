@@ -1,0 +1,133 @@
+name: Release
+
+# Cuts a release from main:
+#   1. rewrites every self-reference (dotsem/actions/...@main) to @v<version> in a release commit
+#   2. tags that commit v<version> and publishes a GitHub release with generated notes
+#   3. moves the floating tags (v<major>, and v0.<minor> during 0.x) to it, unless it's a pre-release
+# main itself is never modified, so it keeps @main.
+#
+# Authenticates as a GitHub App (short-lived installation token, scoped to this repo) because
+# GITHUB_TOKEN can't push refs to commits that change .github/workflows/. Requires:
+#   - variable RELEASE_APP_CLIENT_ID: the app's Client ID
+#   - secret   RELEASE_APP_PRIVATE_KEY: the app's private key (.pem contents)
+# The app needs repository permissions Contents: read & write, Workflows: read & write.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without leading v (e.g. 0.5.0 or 0.5.0-rc.1)"
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Releases must be cut from main (got $GITHUB_REF)"
+            exit 1
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a valid semver version (expected X.Y.Z or X.Y.Z-pre)"
+            exit 1
+          fi
+
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-workflows: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Ensure tag does not exist
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" > /dev/null; then
+            echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+
+      - name: Pin self-references to v${{ inputs.version }}
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mapfile -t files < <(git ls-files '.github/workflows/*.yml' '*/action.yml')
+          sed -i -E "s#(dotsem/actions/[A-Za-z0-9_./-]+)@main\b#\1@v${VERSION}#g" "${files[@]}"
+
+          if git grep -nE 'dotsem/actions/[A-Za-z0-9_./-]+@main\b' -- "${files[@]}"; then
+            echo "::error::Unrewritten @main self-references remain"
+            exit 1
+          fi
+          git --no-pager diff --stat
+
+      - name: Commit, tag and push
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout --detach
+          git commit -am "chore(release): v${VERSION}" --allow-empty
+          git tag -a "v${VERSION}" -m "v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PRERELEASE=()
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE=(--prerelease)
+          fi
+          gh release create "v${VERSION}" --verify-tag --generate-notes --title "v${VERSION}" "${PRERELEASE[@]}"
+
+      - name: Update floating tags
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            echo "Skipping floating tag update for pre-release v${VERSION}"
+            exit 0
+          fi
+
+          MAJOR="${VERSION%%.*}"
+          REST="${VERSION#*.}"
+          MINOR="${REST%%.*}"
+
+          git tag -fa "v${MAJOR}" -m "Update v${MAJOR} to v${VERSION}"
+          git push origin "v${MAJOR}" --force
+
+          # float minor tag during 0.x, where minors may contain breaking changes
+          if [ "$MAJOR" = "0" ]; then
+            git tag -fa "v0.${MINOR}" -m "Update v0.${MINOR} to v${VERSION}"
+            git push origin "v0.${MINOR}" --force
+          fi
