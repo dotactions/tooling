@@ -64,6 +64,7 @@ This file specifies constraints and standards for AI Agents when working on dots
 ## Testing
 
 - Composite actions are tested via `uses: ./<action>` in the matching `internal-test-<area>.yml`, with assertions on outputs and produced files. Add or extend a test for every behavioural change.
+- Script logic is unit-tested in `tests/<name>.test.sh` using the `tests/lib.sh` harness (`new_case`, `run`, `expect*`, `stub`, `only_on`); `internal-test-scripts.yml` runs every one on ubuntu, macOS and Windows. Add cases for every branch you change.
 - Each `internal-*` workflow has a `paths:` filter. When adding files that a workflow should cover, update its filter.
 - Local checks before finishing (run whichever apply):
     - `shellcheck <changed .sh files>`

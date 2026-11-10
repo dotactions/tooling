@@ -33,7 +33,7 @@ jobs:
       - name: Run ShellCheck
         shell: bash
         run: |
-          git ls-files '*.sh' '*.bash' ':!:tests/*' | xargs -r shellcheck
+          git ls-files '*.sh' '*.bash' ':!:tests/fixtures/*' | xargs -r shellcheck -x
 
   psscriptanalyzer:
     name: PSScriptAnalyzer

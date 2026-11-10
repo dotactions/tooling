@@ -1,0 +1,52 @@
+name: Test Scripts
+
+on:
+  pull_request:
+    paths:
+      - "**/scripts/**"
+      - "build-flutter/targets.json"
+      - "tests/*.sh"
+      - ".github/workflows/internal-test-scripts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**/scripts/**"
+      - "build-flutter/targets.json"
+      - "tests/*.sh"
+      - ".github/workflows/internal-test-scripts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-scripts-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test-scripts:
+    name: Shell tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Scripts run on the runner of their build target; each test file skips OSes its script never runs on.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # why: windows runners default to autocrlf, which breaks bash scripts with $'\r' errors.
+      - name: Keep LF line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run tests/*.test.sh
+        shell: bash
+        run: |
+          failed=0
+          for t in tests/*.test.sh; do
+            echo "::group::$t"
+            bash "$t" || failed=1
+            echo "::endgroup::"
+          done
+          exit "$failed"
