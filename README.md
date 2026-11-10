@@ -16,12 +16,12 @@ uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0.5
 
 Resolve a SHA with `git ls-remote https://github.com/dotsem/actions 'refs/tags/v0.5.0^{}'`. Only SHAs of **release tags** pin the whole tree; a SHA from `main` still contains `@main` self-references.
 
-| Ref       | Moves on                 | Use                                                         |
-| :-------- | :----------------------- | :---------------------------------------------------------- |
-| `@<sha>`  | never                    | **Recommended** (recommended by SemGrep): immutable, full reproducibility            |
-| `@v0.5`   | patch releases of `0.5`  | **Recommended**: bug fixes, no breaking changes             |
-| `@v0.5.0` | never (tag can be moved) | Readable, but tags are mutable                              |
-| `@v0`     | every `0.x` release      | Not recommended: during `0.x`, minor releases may break you |
+| Ref       | Moves on                 | Use                                                                       |
+| :-------- | :----------------------- | :------------------------------------------------------------------------ |
+| `@<sha>`  | never                    | **Recommended** (recommended by SemGrep): immutable, full reproducibility |
+| `@v0.5`   | patch releases of `0.5`  | **Recommended**: bug fixes, no breaking changes                           |
+| `@v0.5.0` | never (tag can be moved) | Readable, but tags are mutable                                            |
+| `@v0`     | every `0.x` release      | Not recommended: during `0.x`, minor releases may break you               |
 
 Every release tag pins the **whole tree**. Reusable workflows and actions that call other actions in this repo get those references rewritten to the same release tag, so `flutter-ci.yml@v0.5.0` always runs `build-flutter@v0.5.0`. On `main`, self-references are `@main`.
 
@@ -138,7 +138,7 @@ Sets up Flutter, automatically resolves app metadata from `pubspec.yaml`, instal
 
 > **Prerequisite**: Run `actions/checkout` before calling this action.
 
-> **Flutter version**: unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`, which must be an exact version:
+> **Flutter version**: unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`. An exact version is recommended; a range (`^3.47.1`, `">=3.47.1 <4.0.0"`) installs its lower bound:
 >
 > ```yaml
 > environment:
@@ -179,7 +179,7 @@ Installs the Flutter SDK and runs `flutter pub get`.
 
 > **Prerequisite**: Run `actions/checkout` before calling this action.
 
-> **Flutter version**: unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`, which must be an exact version:
+> **Flutter version**: unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`. An exact version is recommended; a range (`^3.47.1`, `">=3.47.1 <4.0.0"`) installs its lower bound:
 >
 > ```yaml
 > environment:
@@ -328,15 +328,18 @@ Runs Flutter static analysis, unit tests, and cross-platform compilation across 
 
 ```yaml
 permissions:
-    contents: read # required for private repos; optional for public
-```
-
-#### Permissions Required
-
-```yaml
-permissions:
     contents: read # required on private repos; harmless on public
 ```
+
+#### Flutter Version
+
+unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`. An exact version is recommended; a range (`^3.47.1`, `">=3.47.1 <4.0.0"`) installs its lower bound:
+
+ ```yaml
+ environment:
+     sdk: ^3.13.1
+     flutter: 3.47.1
+ ```
 
 #### Inputs
 
@@ -399,6 +402,16 @@ Builds release packages across specified platforms and uploads them directly to 
 permissions:
     contents: write # for uploading release assets
 ```
+
+#### Flutter Version
+
+unless `flutter-version` is passed, the SDK version is read from `environment.flutter` in `<working-directory>/pubspec.yaml`. An exact version is recommended; a range (`^3.47.1`, `">=3.47.1 <4.0.0"`) installs its lower bound:
+
+ ```yaml
+ environment:
+     sdk: ^3.13.1
+     flutter: 3.47.1
+ ```
 
 #### Inputs
 
