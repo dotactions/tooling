@@ -2,17 +2,26 @@
 
 ## Versioning
 
-Pin a **minor** tag:
+Pin a **full commit SHA** of a release tag (most secure, Semgrep standard), with the version in a comment:
+
+```yaml
+uses: dotsem/actions/.github/workflows/flutter-ci.yml@<40-char-sha> # v0.5.0
+```
+
+Or pin a **minor** tag (convenient, receives patch fixes):
 
 ```yaml
 uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0.5
 ```
 
-| Ref             | Moves on                | Use                                                         |
-| :-------------- | :---------------------- | :---------------------------------------------------------- |
-| `@v0.5`         | patch releases of `0.5` | **Recommended**: bug fixes, no breaking changes             |
-| `@v0.5.0` / SHA | never                   | Full reproducibility                                        |
-| `@v0`           | every `0.x` release     | Not recommended: during `0.x`, minor releases may break you |
+Resolve a SHA with `git ls-remote https://github.com/dotsem/actions 'refs/tags/v0.5.0^{}'`. Only SHAs of **release tags** pin the whole tree; a SHA from `main` still contains `@main` self-references.
+
+| Ref       | Moves on                 | Use                                                         |
+| :-------- | :----------------------- | :---------------------------------------------------------- |
+| `@<sha>`  | never                    | **Recommended** (recommended by SemGrep): immutable, full reproducibility            |
+| `@v0.5`   | patch releases of `0.5`  | **Recommended**: bug fixes, no breaking changes             |
+| `@v0.5.0` | never (tag can be moved) | Readable, but tags are mutable                              |
+| `@v0`     | every `0.x` release      | Not recommended: during `0.x`, minor releases may break you |
 
 Every release tag pins the **whole tree**. Reusable workflows and actions that call other actions in this repo get those references rewritten to the same release tag, so `flutter-ci.yml@v0.5.0` always runs `build-flutter@v0.5.0`. On `main`, self-references are `@main`.
 
@@ -20,7 +29,7 @@ Release notes: [GitHub Releases](https://github.com/dotsem/actions/releases).
 
 ## Permissions
 
-Examples assume a **public** repository. In a **private** repository, `actions/checkout` needs `contents: read`, so every job using these actions must grant it:
+Examples assume a **public** repository. In a **private** repository, `actions/checkout` needs `contents: read`, so every job using these actions (or `flutter-ci.yml`) must grant it:
 
 ```yaml
 permissions:
@@ -85,7 +94,7 @@ Parses SARIF output, appends a detailed markdown summary with badge to the GitHu
 
 ```yaml
 permissions:
-    contents: read # required for private repos; optional for public
+    contents: read
     pull-requests: write # for sticky PR comments
     issues: write # for automated issue management
 ```
@@ -302,7 +311,7 @@ jobs:
     audit:
         uses: dotsem/actions/.github/workflows/trivy-audit.yml@v0.5
         permissions:
-            contents: read # required for private repos; optional for public
+            contents: read
             pull-requests: write
             issues: write
         with:
@@ -320,6 +329,13 @@ Runs Flutter static analysis, unit tests, and cross-platform compilation across 
 ```yaml
 permissions:
     contents: read # required for private repos; optional for public
+```
+
+#### Permissions Required
+
+```yaml
+permissions:
+    contents: read # required on private repos; harmless on public
 ```
 
 #### Inputs
@@ -361,8 +377,6 @@ concurrency:
 jobs:
     ci:
         uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0.5
-        permissions:
-            contents: read # required for private repos; optional for public
         with:
             pr-targets: '["android-apk"]'
             push-targets: '["android-aab", "windows"]'
