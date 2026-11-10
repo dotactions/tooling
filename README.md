@@ -18,6 +18,17 @@ Every release tag pins the **whole tree**. Reusable workflows and actions that c
 
 Release notes: [GitHub Releases](https://github.com/dotsem/actions/releases).
 
+## Permissions
+
+Examples assume a **public** repository. In a **private** repository, `actions/checkout` needs `contents: read`, so every job using these actions must grant it:
+
+```yaml
+permissions:
+    contents: read # required for private repos; optional for public
+```
+
+Reusable workflows can only narrow the caller's token permissions, never widen them. Grant the permissions listed under each workflow in the calling job.
+
 ## Actions
 
 ### Setup Node & pnpm (`setup-node`)
@@ -74,7 +85,7 @@ Parses SARIF output, appends a detailed markdown summary with badge to the GitHu
 
 ```yaml
 permissions:
-    contents: read
+    contents: read # required for private repos; optional for public
     pull-requests: write # for sticky PR comments
     issues: write # for automated issue management
 ```
@@ -244,8 +255,8 @@ Runs Trivy vulnerability and misconfiguration scanning on the caller repository,
 ```yaml
 permissions:
     contents: read
-    pull-requests: write # for sticky PR comments
-    issues: write # for automated issue management
+    issues: write # PR comments + issue tracking
+    pull-requests: write # optional: only if you replace the issues API with the pulls API
 ```
 
 #### Inputs
@@ -291,7 +302,7 @@ jobs:
     audit:
         uses: dotsem/actions/.github/workflows/trivy-audit.yml@v0.5
         permissions:
-            contents: read
+            contents: read # required for private repos; optional for public
             pull-requests: write
             issues: write
         with:
@@ -303,6 +314,13 @@ jobs:
 ### Flutter CI (`flutter-ci.yml`)
 
 Runs Flutter static analysis, unit tests, and cross-platform compilation across a specified list of targets.
+
+#### Permissions Required
+
+```yaml
+permissions:
+    contents: read # required for private repos; optional for public
+```
 
 #### Inputs
 
@@ -343,6 +361,8 @@ concurrency:
 jobs:
     ci:
         uses: dotsem/actions/.github/workflows/flutter-ci.yml@v0.5
+        permissions:
+            contents: read # required for private repos; optional for public
         with:
             pr-targets: '["android-apk"]'
             push-targets: '["android-aab", "windows"]'
