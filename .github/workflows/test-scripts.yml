@@ -1,7 +1,18 @@
 name: Test Scripts
 
-# Caller-only: the caller owns the paths: filter (its scripts, data files and tests).
+# Callers own their paths: filter (their scripts, data files and tests). The push/pull_request triggers are
+# tooling's own CI: its tests run the inline logic of every workflow here.
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "tests/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "tests/**"
+  workflow_dispatch:
   workflow_call:
 
 permissions:

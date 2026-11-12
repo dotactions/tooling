@@ -76,6 +76,10 @@ finish
 
 `REPO_ROOT` is the consuming repo (derived from the test file's path). Functions: `new_case`, `run`, `stub`, `only_on`, `output`, `env_var`, `stub_log`, `expect`, `expect_ok`, `expect_fail`, `expect_file`, `finish`. Bump the submodule with Dependabot (`gitsubmodule`).
 
+## Tooling's own tests
+
+`tests/*.test.sh` run the exact inline `run:` blocks of these workflows (extracted with `yq`) against scratch repos: release versioning, rewrite, tagging and floating tags; both check-refs rules; the test loop; actionlint and ShellCheck through the pinned image (needs Docker); and the harness itself on all three OSes. `test-scripts.yml` runs them on every push and PR here.
+
 ## Org setup (once)
 
 Releases authenticate as a GitHub App, because `GITHUB_TOKEN` can't push tags to commits that change `.github/workflows/`.
