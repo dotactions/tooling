@@ -74,7 +74,7 @@ expect "sets output" "expected" "$(output name)"
 finish
 ```
 
-`REPO_ROOT` is the consuming repo (derived from the test file's path). Functions: `new_case`, `run`, `stub`, `only_on`, `output`, `env_var`, `stub_log`, `expect`, `expect_ok`, `expect_fail`, `expect_file`, `finish`. Bump the submodule with Dependabot (`gitsubmodule`).
+`REPO_ROOT` is the consuming repo (derived from the test file's path). Functions: `new_case`, `run`, `stub`, `only_on`, `output`, `env_var`, `stub_log`, `expect`, `expect_ok`, `expect_fail`, `expect_file`, `finish`. Bump the submodule with a Dependabot `gitsubmodule` entry. It follows tooling `main`, not release tags, so the harness can be a few commits ahead of the pinned workflows; the Dependabot PR runs your tests against it before you merge.
 
 ## Tooling's own tests
 
