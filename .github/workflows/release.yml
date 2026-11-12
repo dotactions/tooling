@@ -4,6 +4,7 @@ name: Release
 #   1. rewrites every self-reference (<owner>/<repo>[/path]@main) to @v<version> in a release commit
 #   2. tags that commit v<version> and publishes a GitHub release with generated notes
 #   3. moves the floating tags (v<major>, and v0.<minor> during 0.x) to it, unless it's a pre-release
+#      or an older version than the one the floating tag already has (so a hotfix never moves v1 backwards)
 # main itself is never modified, so it keeps @main.
 #
 # Authenticates as a GitHub App (short-lived installation token, scoped to the caller's repo) because
@@ -39,6 +40,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Validate inputs
         shell: bash
@@ -85,7 +87,8 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           self="${GITHUB_REPOSITORY//./\\.}(/[A-Za-z0-9_./-]+)?"
-          mapfile -t files < <(git ls-files '.github/workflows/*.yml' 'action.yml' '*/action.yml')
+          mapfile -t files < <(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+            'action.yml' 'action.yaml' '*/action.yml' '*/action.yaml')
           sed -i -E "s#(${self})@main\b#\1@v${VERSION}#g" "${files[@]}"
 
           if git grep -nE "${self}@main\b" -- "${files[@]}"; then
@@ -133,11 +136,21 @@ jobs:
           REST="${VERSION#*.}"
           MINOR="${REST%%.*}"
 
-          git tag -fa "v${MAJOR}" -m "Update v${MAJOR} to v${VERSION}"
-          git push origin "v${MAJOR}" --force
+          # highest stable release tag matching the pattern; the new tag is already created locally.
+          highest() {
+            git tag -l "$1" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+          }
+          float() {
+            if [ "$(highest "$1.*")" != "v${VERSION}" ]; then
+              echo "::notice::Not moving $1: a newer release than v${VERSION} exists ($(highest "$1.*"))"
+              return
+            fi
+            git tag -fa "$1" -m "Update $1 to v${VERSION}"
+            git push origin "$1" --force
+          }
 
+          float "v${MAJOR}"
           # float minor tag during 0.x, where minors may contain breaking changes
           if [ "$MAJOR" = "0" ]; then
-            git tag -fa "v0.${MINOR}" -m "Update v0.${MINOR} to v${VERSION}"
-            git push origin "v0.${MINOR}" --force
+            float "v0.${MINOR}"
           fi
