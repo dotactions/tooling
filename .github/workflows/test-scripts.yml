@@ -1,20 +1,8 @@
 name: Test Scripts
 
+# Caller-only: the caller owns the paths: filter (its scripts, data files and tests).
 on:
-  pull_request:
-    paths:
-      - "**/scripts/**"
-      - "build-flutter/targets.json"
-      - "tests/*.sh"
-      - ".github/workflows/internal-test-scripts.yml"
-  push:
-    branches: [main]
-    paths:
-      - "**/scripts/**"
-      - "build-flutter/targets.json"
-      - "tests/*.sh"
-      - ".github/workflows/internal-test-scripts.yml"
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -39,6 +27,8 @@ jobs:
         run: git config --global core.autocrlf false
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true # .tooling provides tests/lib.sh
 
       - name: Run tests/*.test.sh
         shell: bash

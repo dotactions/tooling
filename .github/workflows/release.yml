@@ -1,15 +1,15 @@
 name: Release
 
-# Cuts a release from main:
-#   1. rewrites every self-reference (dotsem/actions/...@main) to @v<version> in a release commit
+# Cuts a release of the CALLING repo from its main (github.* and vars resolve to the caller here):
+#   1. rewrites every self-reference (<owner>/<repo>[/path]@main) to @v<version> in a release commit
 #   2. tags that commit v<version> and publishes a GitHub release with generated notes
 #   3. moves the floating tags (v<major>, and v0.<minor> during 0.x) to it, unless it's a pre-release
 # main itself is never modified, so it keeps @main.
 #
-# Authenticates as a GitHub App (short-lived installation token, scoped to this repo) because
-# GITHUB_TOKEN can't push refs to commits that change .github/workflows/. Requires:
+# Authenticates as a GitHub App (short-lived installation token, scoped to the caller's repo) because
+# GITHUB_TOKEN can't push refs to commits that change .github/workflows/. Requires, org-level:
 #   - variable RELEASE_APP_CLIENT_ID: the app's Client ID
-#   - secret   RELEASE_APP_PRIVATE_KEY: the app's private key (.pem contents)
+#   - secret   RELEASE_APP_PRIVATE_KEY: the app's private key (.pem contents), passed by the caller
 # The app needs repository permissions Contents: read & write, Workflows: read & write.
 
 on:
@@ -19,6 +19,15 @@ on:
         description: "Version to release, without leading v (e.g. 0.5.0 or 0.5.0-rc.1)"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to release, without leading v (e.g. 0.5.0 or 0.5.0-rc.1)"
+        required: true
+        type: string
+    secrets:
+      RELEASE_APP_PRIVATE_KEY:
+        required: true
 
 concurrency:
   group: release
@@ -75,10 +84,11 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          mapfile -t files < <(git ls-files '.github/workflows/*.yml' '*/action.yml')
-          sed -i -E "s#(dotsem/actions/[A-Za-z0-9_./-]+)@main\b#\1@v${VERSION}#g" "${files[@]}"
+          self="${GITHUB_REPOSITORY//./\\.}(/[A-Za-z0-9_./-]+)?"
+          mapfile -t files < <(git ls-files '.github/workflows/*.yml' 'action.yml' '*/action.yml')
+          sed -i -E "s#(${self})@main\b#\1@v${VERSION}#g" "${files[@]}"
 
-          if git grep -nE 'dotsem/actions/[A-Za-z0-9_./-]+@main\b' -- "${files[@]}"; then
+          if git grep -nE "${self}@main\b" -- "${files[@]}"; then
             echo "::error::Unrewritten @main self-references remain"
             exit 1
           fi

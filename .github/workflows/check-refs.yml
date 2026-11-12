@@ -1,16 +1,19 @@
-name: Check Self-References
+name: Check References
 
 on:
   pull_request:
     paths:
       - ".github/workflows/*.yml"
+      - "action.yml"
       - "**/action.yml"
   push:
     branches: [main]
     paths:
       - ".github/workflows/*.yml"
+      - "action.yml"
       - "**/action.yml"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -21,17 +24,31 @@ concurrency:
 
 jobs:
   check-refs:
-    name: Self-references point at @main
+    name: dotactions references
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Check self-references point at @main
+      # Inline, not a script: a called workflow only has the caller's checkout.
+      - name: Check references to dotactions repos
         shell: bash
         run: |
-          # On main, self-references must be @main; internal-release.yml rewrites them to the release tag.
-          if git grep -nE 'dotsem/actions/[A-Za-z0-9_./-]+@' -- '.github/workflows/*.yml' '*/action.yml' \
-              | grep -vE 'dotsem/actions/[A-Za-z0-9_./-]+@main\b'; then
-            echo "::error::Self-references to dotsem/actions must use @main (release tags are applied by internal-release.yml)"
-            exit 1
+          path='(/[A-Za-z0-9_./-]+)?'
+          self="${GITHUB_REPOSITORY//./\\.}${path}"
+          org="${GITHUB_REPOSITORY_OWNER//./\\.}/[A-Za-z0-9_.-]+${path}"
+          files=('.github/workflows/*.yml' 'action.yml' '*/action.yml')
+          failed=0
+
+          # Self-references stay @main on main; the release workflow rewrites them to the release tag.
+          if git grep -nE "${self}@" -- "${files[@]}" | grep -vE "${self}@main\b"; then
+            echo "::error::References to ${GITHUB_REPOSITORY} must use @main (release tags are applied by the release workflow)"
+            failed=1
           fi
+
+          # Other repos in the org: release-tag commit SHA plus version comment, so Dependabot can bump them.
+          if git grep -nE "${org}@" -- "${files[@]}" | grep -vE "${self}@" \
+              | grep -vE "${org}@[0-9a-f]{40} # v[0-9]+\.[0-9]+\.[0-9]+"; then
+            echo "::error::References to other ${GITHUB_REPOSITORY_OWNER} repos must be pinned as @<40-char release-tag sha> # vX.Y.Z"
+            failed=1
+          fi
+          exit "$failed"

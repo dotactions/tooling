@@ -5,8 +5,9 @@
 # Each case: new_case; set up files in "$WORK"; run <script> [VAR=val ...]; assert.
 set -euo pipefail
 
+# $0 is the test file, so this is the consuming repo even when sourced from its .tooling submodule.
 # shellcheck disable=SC2034 # used by the test files that source this.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_TMP=$(mktemp -d)
 trap 'rm -rf "$TEST_TMP"' EXIT
 STUB_DIR="$TEST_TMP/stubs"

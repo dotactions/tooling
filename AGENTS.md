@@ -1,6 +1,6 @@
-# Agents Rules for dotsem/actions
+# Agents Rules for dotactions/tooling
 
-This file specifies constraints and standards for AI Agents when working on dotsem/actions: a monorepo of opinionated composite/JS actions and reusable workflows consumed by other repositories. Every change here ships to every consumer, so correctness and pinning discipline outrank convenience.
+Reusable workflows (`workflow_call`) and the shell test harness shared by every `dotactions/*` repo's CI. Nothing here runs in a consumer's pipeline, but every change runs in every `dotactions` repo, so a broken workflow blocks all of them at once.
 
 ## CRITICAL INSTRUCTIONS
 
@@ -20,56 +20,46 @@ This file specifies constraints and standards for AI Agents when working on dots
 4. **Comments & Standards**:
     - Strictly NO inline comments explaining syntax or obvious actions. Comments explain _why_ (constraints, GitHub quirks, security reasons), never _what_.
     - Ceiling of 300 lines per file (excluding `README.md`, lockfiles, fixtures and `dist/`). Always ask before performing major file splits or autonomous refactoring.
-    - Package manager is strictly `pnpm`.
 
 ## Repository Layout
 
-| Path                               | Purpose                                                                                                                            |
-| :--------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
-| `<action>/action.yml`              | Public composite or JS actions (`setup-node`, `build-node`, `setup-flutter`, `build-flutter`, `flutter-matrix`, `security-report`) |
-| `<action>/scripts/`                | Shell / PowerShell called from composite steps via `${{ github.action_path }}`                                                     |
-| `security-report/src/` → `dist/`   | TypeScript source, bundled by `tsup` into committed `dist/index.js`                                                                |
-| `build-flutter/targets.json`       | Single source of truth for valid Flutter targets and their runner OS                                                               |
-| `.github/workflows/<name>.yml`     | Public reusable workflows (`workflow_call`): `flutter-ci`, `flutter-cd`, `trivy-audit`                                             |
-| `.github/workflows/internal-*.yml` | This repo's own CI, tests and release. Never consumed externally                                                                   |
-| `tests/fixtures/`                  | Minimal Node / Flutter projects and SARIF files used by `internal-test-*` workflows                                                |
+| Path | Purpose |
+| :--- | :--- |
+| `.github/workflows/release.yml` | Cuts a release in the **calling** repo: rewrites its `@main` self-references, tags, moves floating tags |
+| `.github/workflows/check-refs.yml` | Self-references `@main`; other `dotactions` repos pinned by release-tag SHA |
+| `.github/workflows/actionlint.yml`, `lint.yml` | actionlint, ShellCheck, PSScriptAnalyzer |
+| `.github/workflows/test-scripts.yml` | Runs the caller's `tests/*.test.sh` on ubuntu, macOS and Windows |
+| `tests/lib.sh` | Test harness, consumed as the `.tooling` git submodule (tests only, never at runtime) |
 
 ## Project Rules
 
-### Pinning & Self-References
+### Reusable-workflow context
 
-- Every third-party `uses:` is pinned to a full commit SHA with a version comment: `uses: owner/repo@<40-char-sha> # vX.Y.Z`. Resolve SHAs with `git ls-remote --tags`; never guess or invent one. If you cannot resolve it, stop and ask.
-- References to this repo's own actions **must** be `dotsem/actions/<path>@main` with the comment `# @main is rewritten to the exact release tag by internal-release.yml`. Never write `@v0`, `@vX.Y.Z` or a SHA for a self-reference; `internal-check-refs.yml` fails on it.
-- Composite actions cannot reference sibling actions by relative path. Inside a reusable workflow, `./` points at the **caller's** repo. Never "fix" this with a checkout of `dotsem/actions` at a branch.
+- In a called workflow, `github.repository`, `github.ref`, `github.event.*`, `vars` and the checkout default are the **caller's**. That is what makes one `release.yml` work for every repo. Never hardcode a repo name; derive it from `$GITHUB_REPOSITORY` / `$GITHUB_REPOSITORY_OWNER`.
+- A called workflow cannot read files from this repo (checkout gets the caller's), so logic stays inline in `run:`. Keep it short, bash, `set -euo pipefail` semantics.
+- Called workflows can only narrow the caller's permissions. A job that needs more than `contents: read` documents it in `README.md` so callers grant it.
+- Each workflow keeps its own `concurrency:`. Callers must not set the same group (deadlock).
+- Workflows with their own `on:` triggers next to `workflow_call` are this repo's own CI; no separate caller files.
 
-### Inputs, Scripts & Security
+### Pinning
+
+- Every `uses:` is pinned to a full commit SHA with a version comment: `uses: owner/repo@<40-char-sha> # vX.Y.Z`. Resolve SHAs with `git ls-remote --tags`; never guess or invent one. If you cannot resolve it, stop and ask.
+
+### Security
 
 - Never interpolate `${{ }}` directly into `run:`. Pass values through `env:` and reference `"$VAR"`.
-- Logic longer than a few lines goes into `<action>/scripts/*.sh` (bash, `set -euo pipefail`) or `*.ps1`, not inline YAML. Scripts must pass ShellCheck / PSScriptAnalyzer.
-- Validate inputs early and fail with `::error::` messages naming the allowed values.
 - Workflows declare `permissions: contents: read` at the top level and widen per job only where required.
-- Input defaults must not duplicate data that lives elsewhere (e.g. Flutter version comes from the consumer's `pubspec.yaml`, pnpm from `packageManager`, targets from `targets.json`).
-
-### TypeScript (`security-report`)
-
-- After changing anything in `src/`, run `pnpm build` and include the regenerated `dist/`. `internal-check-dist.yml` fails on drift.
-- Run `pnpm check-types` before finishing. No `any` without a `// ponytail:` justification.
 
 ### Public API & Versioning
 
-- Inputs, outputs, input defaults, artifact names and reusable-workflow `with:`/`secrets:` are public API. Renaming, removing or changing the default of any of them is a **breaking change**: flag it explicitly in your response so the human can bump the minor version (during `0.x`).
-- Every public input/output change must be reflected in `README.md` (tables + usage examples, which pin `@v0.N`).
-- Releases are cut only by the human via the `Release` workflow (`internal-release.yml`). Never create or move tags, and never edit the floating-tag logic without being asked.
+- Workflow `inputs:`/`secrets:`, the check-refs rules, the release tag scheme and the `tests/lib.sh` functions (`new_case`, `run`, `stub`, `expect*`, `only_on`, `finish`, `REPO_ROOT`, `WORK`) are public API for every `dotactions` repo. Changing them is a **breaking change**: flag it explicitly so the human can bump the major version.
+- Releases are cut only by the human via the `Release` workflow. Never create or move tags, and never edit the floating-tag logic without being asked.
 
 ## Testing
 
-- Composite actions are tested via `uses: ./<action>` in the matching `internal-test-<area>.yml`, with assertions on outputs and produced files. Add or extend a test for every behavioural change.
-- Script logic is unit-tested in `tests/<name>.test.sh` using the `tests/lib.sh` harness (`new_case`, `run`, `expect*`, `stub`, `only_on`); `internal-test-scripts.yml` runs every one on ubuntu, macOS and Windows. Add cases for every branch you change.
-- Each `internal-*` workflow has a `paths:` filter. When adding files that a workflow should cover, update its filter.
+- `tests/lib.sh` must stay bash 3.2 compatible (macOS runners). Verify a change by running a consumer's tests against it, e.g. from `../flutter`: `bash tests/resolve-matrix.test.sh` with `.tooling` pointing at your working copy.
+- Inline `run:` logic you change (check-refs, release rewrite): extract it to a temp script and run it against a scratch git repo with sample refs before finishing.
 - Local checks before finishing (run whichever apply):
-    - `shellcheck <changed .sh files>`
+    - `shellcheck tests/lib.sh`
     - `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12` for workflow changes
-    - `pnpm check-types && pnpm build` for `security-report`
-    - `pnpm prettier --check .`
-    - Exercise changed scripts directly with sample env vars and a temp `GITHUB_OUTPUT` / `GITHUB_ENV`
 - Report honestly which checks ran and which could not (e.g. multi-OS builds only run in CI).
