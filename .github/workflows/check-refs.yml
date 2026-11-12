@@ -4,14 +4,20 @@ on:
   pull_request:
     paths:
       - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
       - "action.yml"
+      - "action.yaml"
       - "**/action.yml"
+      - "**/action.yaml"
   push:
     branches: [main]
     paths:
       - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
       - "action.yml"
+      - "action.yaml"
       - "**/action.yml"
+      - "**/action.yaml"
   workflow_dispatch:
   workflow_call:
 
@@ -26,6 +32,7 @@ jobs:
   check-refs:
     name: dotactions references
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -36,7 +43,7 @@ jobs:
           path='(/[A-Za-z0-9_./-]+)?'
           self="${GITHUB_REPOSITORY//./\\.}${path}"
           org="${GITHUB_REPOSITORY_OWNER//./\\.}/[A-Za-z0-9_.-]+${path}"
-          files=('.github/workflows/*.yml' 'action.yml' '*/action.yml')
+          files=('.github/workflows/*.yml' '.github/workflows/*.yaml' 'action.yml' 'action.yaml' '*/action.yml' '*/action.yaml')
           failed=0
 
           # Self-references stay @main on main; the release workflow rewrites them to the release tag.

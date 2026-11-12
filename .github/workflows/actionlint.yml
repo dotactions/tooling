@@ -5,13 +5,17 @@ on:
     paths:
       - ".github/workflows/**"
       - "action.yml"
+      - "action.yaml"
       - "**/action.yml"
+      - "**/action.yaml"
   push:
     branches: [main]
     paths:
       - ".github/workflows/**"
       - "action.yml"
+      - "action.yaml"
       - "**/action.yml"
+      - "**/action.yaml"
   workflow_dispatch:
   workflow_call:
 
@@ -26,16 +30,14 @@ jobs:
   actionlint:
     name: actionlint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write # github-check reporter
-      pull-requests: write # github-pr-review reporter
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@a7d35aaf8c309203a4ae861d32b7bd490baa7bf3 # v1.83.0
-        with:
-          reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
-          filter_mode: ${{ github.event_name == 'pull_request' && 'file' || 'nofilter' }}
-          fail_level: error
+        shell: bash
+        env:
+          ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo "$ACTIONLINT_IMAGE" \
+            -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}\n{{end}}'

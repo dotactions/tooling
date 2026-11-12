@@ -4,11 +4,11 @@ Shared CI for the `dotactions/*` repos: reusable workflows plus the shell test h
 
 | Workflow | Does | Caller job needs |
 | :--- | :--- | :--- |
-| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) | `secrets: inherit` |
+| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) forward only | `secrets: inherit` |
 | `check-refs.yml` | Self-references must be `@main`; other repos in the org must be `@<40-char release-tag sha> # vX.Y.Z` | — |
-| `actionlint.yml` | actionlint via reviewdog | `checks: write`, `pull-requests: write` |
-| `lint.yml` | ShellCheck and PSScriptAnalyzer on tracked scripts | — |
-| `test-scripts.yml` | `tests/*.test.sh` on ubuntu, macOS and Windows, with submodules | — |
+| `actionlint.yml` | actionlint (pinned image), errors as annotations | — |
+| `lint.yml` | ShellCheck (pinned image) and PSScriptAnalyzer (pinned version) on tracked scripts | — |
+| `test-scripts.yml` | `tests/*.test.sh` on ubuntu, macOS and Windows, with submodules; fails if there are none | — |
 
 Inside a called workflow, `github.*` and `vars` belong to the **caller**, so every workflow acts on the calling repo.
 
@@ -50,13 +50,9 @@ permissions:
 jobs:
   actionlint:
     uses: dotactions/tooling/.github/workflows/actionlint.yml@<sha> # v1.0.0
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
 ```
 
-`check-refs.yml`, `lint.yml` and `test-scripts.yml` are called the same way, with no `with:` or extra permissions.
+`check-refs.yml`, `lint.yml` and `test-scripts.yml` are called the same way. None needs `with:` or permissions beyond `contents: read`.
 
 ## Test harness
 

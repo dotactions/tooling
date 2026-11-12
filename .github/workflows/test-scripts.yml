@@ -15,6 +15,7 @@ jobs:
   test-scripts:
     name: Shell tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -33,8 +34,14 @@ jobs:
       - name: Run tests/*.test.sh
         shell: bash
         run: |
+          shopt -s nullglob
+          tests=(tests/*.test.sh)
+          if [ "${#tests[@]}" -eq 0 ]; then
+            echo "::error::No tests/*.test.sh found; don't call test-scripts.yml from a repo without script tests"
+            exit 1
+          fi
           failed=0
-          for t in tests/*.test.sh; do
+          for t in "${tests[@]}"; do
             echo "::group::$t"
             bash "$t" || failed=1
             echo "::endgroup::"
