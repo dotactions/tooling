@@ -30,6 +30,8 @@ Reusable workflows (`workflow_call`) and the shell test harness shared by every 
 | `.github/workflows/actionlint.yml`, `lint.yml` | actionlint, ShellCheck, PSScriptAnalyzer |
 | `.github/workflows/test-scripts.yml` | Runs the caller's `tests/*.test.sh` on ubuntu, macOS and Windows |
 | `tests/lib.sh` | Test harness, consumed as the `.tooling` git submodule (tests only, never at runtime) |
+| `tests/workflow.sh` | Tooling-only helpers: extract a step's `run:` block (`step_script`) or field (`step_field`) |
+| `tests/*.test.sh` | Tooling's own tests: release, check-refs, test-scripts, linters (Docker) and the harness itself |
 
 ## Project Rules
 
@@ -57,9 +59,10 @@ Reusable workflows (`workflow_call`) and the shell test harness shared by every 
 
 ## Testing
 
-- `tests/lib.sh` must stay bash 3.2 compatible (macOS runners). Verify a change by running a consumer's tests against it, e.g. from `../flutter`: `bash tests/resolve-matrix.test.sh` with `.tooling` pointing at your working copy.
-- Inline `run:` logic you change (check-refs, release rewrite): extract it to a temp script and run it against a scratch git repo with sample refs before finishing.
+- Every inline `run:` block with logic has a test in `tests/<workflow>.test.sh` that runs the exact block via `step_script` (no copies, so tests can't drift). Add cases for every branch you change; refer to steps by `name:`, so renaming a step means updating its test.
+- `tests/lib.test.sh` covers the harness on all three OSes. A `lib.sh` change also gets a run of a consumer's tests, e.g. from `../flutter` with `.tooling` pointing at your working copy.
+- `test-scripts.yml` runs all of them on push/PR. Locally: `for t in tests/*.test.sh; do bash "$t"; done` (needs `yq` or python3 + PyYAML; `linters.test.sh` needs Docker and skips without it).
 - Local checks before finishing (run whichever apply):
-    - `shellcheck tests/lib.sh`
+    - `for t in tests/*.test.sh; do bash "$t"; done`
     - `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12` for workflow changes
 - Report honestly which checks ran and which could not (e.g. multi-OS builds only run in CI).
