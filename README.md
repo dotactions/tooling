@@ -90,4 +90,4 @@ Releases authenticate as a GitHub App, because `GITHUB_TOKEN` can't push tags to
 
 ## Releasing
 
-Run the `Release` workflow on `main` with a version (`1.0.0`, or `1.0.0-rc.1` for a pre-release that moves no floating tags).
+Go to **Actions → Release → Run workflow** on `main` and enter a version: `1.0.0`, or `1.0.0-rc.1` for a pre-release that moves no floating tags. Don't use **Releases → Draft a new release**: it doesn't move the floating `v1` tag.
