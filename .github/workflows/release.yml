@@ -1,4 +1,5 @@
 name: Release
+run-name: Release ${{ inputs.version }}
 
 # Cuts a release of the CALLING repo from its main (github.* and vars resolve to the caller here):
 #   1. rewrites every self-reference (<owner>/<repo>[/path]@main) to @v<version> in a release commit

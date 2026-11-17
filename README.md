@@ -19,6 +19,7 @@ Pin each call to a release-tag SHA (`git ls-remote https://github.com/dotactions
 ```yaml
 # .github/workflows/internal-release.yml
 name: Release
+run-name: Release ${{ inputs.version }}
 on:
   workflow_dispatch:
     inputs:
