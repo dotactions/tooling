@@ -20,12 +20,22 @@ on:
         description: "Version to release (e.g. 0.1.0, v0.1.0 or 0.1.0-rc.1)"
         required: true
         type: string
+      previous-tag:
+        description: "Tag to start the release notes from (default: highest stable tag below version)"
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       version:
         description: "Version to release (e.g. 0.1.0, v0.1.0 or 0.1.0-rc.1)"
         required: true
         type: string
+      previous-tag:
+        description: "Tag to start the release notes from (default: highest stable tag below version)"
+        required: false
+        type: string
+        default: ""
     secrets:
       RELEASE_APP_PRIVATE_KEY:
         required: true
@@ -47,6 +57,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
+          PREVIOUS_TAG: ${{ inputs.previous-tag }}
         run: |
           VERSION="${VERSION#v}"
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
@@ -58,6 +69,13 @@ jobs:
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            if ! [[ "${PREVIOUS_TAG#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::previous-tag '$PREVIOUS_TAG' is not a valid semver tag (expected X.Y.Z or vX.Y.Z)"
+              exit 1
+            fi
+            echo "previous-tag=v${PREVIOUS_TAG#v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create release app token
         id: app-token
@@ -78,9 +96,14 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.validate.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.validate.outputs.previous-tag }}
         run: |
           if git rev-parse -q --verify "refs/tags/v${VERSION}" > /dev/null; then
             echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+          if [ -n "$PREVIOUS_TAG" ] && ! git rev-parse -q --verify "refs/tags/${PREVIOUS_TAG}" > /dev/null; then
+            echo "::error::previous-tag ${PREVIOUS_TAG} does not exist"
             exit 1
           fi
 
@@ -117,13 +140,24 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.validate.outputs.version }}
+          PREVIOUS_TAG: ${{ steps.validate.outputs.previous-tag }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PRERELEASE=()
           if [[ "$VERSION" == *-* ]]; then
             PRERELEASE=(--prerelease)
           fi
-          gh release create "v${VERSION}" --verify-tag --generate-notes --title "v${VERSION}" "${PRERELEASE[@]}"
+          PREV="$PREVIOUS_TAG"
+          if [ -z "$PREV" ]; then
+            # Release commits are detached from main, so GitHub can't find the previous release on its own and
+            # would list the whole history. Start from the highest stable tag below this version instead.
+            BASE="v${VERSION%%-*}"
+            PREV=$( { git tag -l 'v*.*.*' | grep -v -- '-' | grep -vxF "$BASE"; echo "$BASE"; } \
+              | sort -V | grep -xF -B1 "$BASE" | head -n1 )
+            if [ "$PREV" = "$BASE" ]; then PREV=""; fi
+          fi
+          gh release create "v${VERSION}" --verify-tag --generate-notes ${PREV:+--notes-start-tag "$PREV"} \
+            --title "v${VERSION}" "${PRERELEASE[@]}"
 
       - name: Update floating tags
         shell: bash
