@@ -25,7 +25,8 @@ Reusable workflows (`workflow_call`) and the shell test harness shared by every 
 
 | Path | Purpose |
 | :--- | :--- |
-| `.github/workflows/release.yml` | Cuts a release in the **calling** repo: rewrites its `@main` self-references, tags, moves floating tags |
+| `.github/workflows/release.yml` | Cuts a release in the **calling** repo: rewrites its `@main` self-references, tags, then calls `floating-tags.yml` |
+| `.github/workflows/floating-tags.yml` | Moves the **calling** repo's floating tags to a release tag; also called directly by UI-released (Marketplace) repos |
 | `.github/workflows/check-refs.yml` | Self-references `@main`; other `dotactions` repos pinned by release-tag SHA |
 | `.github/workflows/actionlint.yml`, `lint.yml` | actionlint, ShellCheck, PSScriptAnalyzer |
 | `.github/workflows/test-scripts.yml` | Runs the caller's `tests/*.test.sh` on ubuntu, macOS and Windows |

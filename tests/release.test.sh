@@ -12,7 +12,6 @@ EXISTS=$(step_script "$WF" release "Ensure tag does not exist")
 PIN=$(step_script "$WF" release "Pin self-references to the release tag")
 COMMIT=$(step_script "$WF" release "Commit, tag and push")
 RELEASE=$(step_script "$WF" release "Create GitHub release")
-FLOAT=$(step_script "$WF" release "Update floating tags")
 
 # The developer's own git config (signing, hooks) must not leak into the cases.
 GITVARS=(GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1)
@@ -145,31 +144,5 @@ expect "pre-release starts at the last stable" "v1.3.0" "$(notes_start 2.0.0-rc.
 expect "stable after an rc skips the rc" "v1.3.0" "$(notes_start 2.0.0)"
 expect "first release has no start tag" "" "$(notes_start 0.1.0)"
 expect "previous-tag overrides the computed start" "v0.9.0" "$(notes_start 1.3.1 v0.9.0)"
-
-# --- Update floating tags: one repo, a sequence of releases on separate commits
-new_case
-repo
-release() {
-  g commit -q --allow-empty -m "$1"
-  g tag -a "v$1" -m "v$1"
-  run "$FLOAT" "${GITVARS[@]}" VERSION="$1"
-}
-release 0.5.0
-expect "0.5.0 moves v0" "$(at v0.5.0)" "$(at v0)"
-expect "0.5.0 moves v0.5" "$(at v0.5.0)" "$(at v0.5)"
-release 0.6.0
-expect "0.6.0 moves v0" "$(at v0.6.0)" "$(at v0)"
-release 0.5.1
-expect_ok "older release exits 0"
-expect "0.5.1 leaves v0 on 0.6.0" "$(at v0.6.0)" "$(at v0)"
-expect "0.5.1 moves v0.5" "$(at v0.5.1)" "$(at v0.5)"
-expect "skipped tag is explained" "yes" "$(grep -q '::notice::Not moving v0' "$CASE_DIR/stdout" && echo yes)"
-release 1.0.0
-expect "1.0.0 moves v1" "$(at v1.0.0)" "$(at v1)"
-expect "1.0.0 leaves v0 alone" "$(at v0.6.0)" "$(at v0)"
-expect "no minor tag floats after 0.x" "" "$(at v1.0)"
-release 1.1.0-rc.1
-expect "pre-release moves nothing" "$(at v1.0.0)" "$(at v1)"
-expect "floating tags are force-pushed" "git push origin v1 --force" "$(stub_log | grep '^git push' | tail -n 1)"
 
 finish
