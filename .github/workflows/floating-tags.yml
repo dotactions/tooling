@@ -1,0 +1,98 @@
+name: Floating Tags
+
+# Moves the floating tags of the CALLING repo (v<major>, and v0.<minor> during 0.x) to an existing release tag,
+# forward only, never for pre-releases. Two callers:
+#   - release.yml, right after it tags a release
+#   - repos released through the GitHub UI (Marketplace actions, where the publish checkbox only exists in the UI),
+#     from a workflow on `release: published`
+#
+# Authenticates as the same GitHub App as release.yml, because GITHUB_TOKEN can be refused when a tag moves
+# across commits that change .github/workflows/.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version or tag (e.g. 0.1.0, v0.1.0)"
+        required: true
+        type: string
+    secrets:
+      RELEASE_APP_PRIVATE_KEY:
+        required: true
+
+concurrency:
+  group: floating-tags
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  floating-tags:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate inputs
+        id: validate
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a valid semver version (expected X.Y.Z or X.Y.Z-pre, optionally with a leading v)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-workflows: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Update floating tags
+        shell: bash
+        env:
+          VERSION: ${{ steps.validate.outputs.version }}
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/v${VERSION}" > /dev/null; then
+            echo "::error::Tag v${VERSION} does not exist"
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then
+            echo "Skipping floating tag update for pre-release v${VERSION}"
+            exit 0
+          fi
+
+          MAJOR="${VERSION%%.*}"
+          REST="${VERSION#*.}"
+          MINOR="${REST%%.*}"
+
+          # highest stable release tag matching the pattern, including the new one
+          highest() {
+            git tag -l "$1" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1
+          }
+          float() {
+            if [ "$(highest "$1.*")" != "v${VERSION}" ]; then
+              echo "::notice::Not moving $1: a newer release than v${VERSION} exists ($(highest "$1.*"))"
+              return
+            fi
+            git tag -fa "$1" -m "Update $1 to v${VERSION}"
+            git push origin "$1" --force
+          }
+
+          float "v${MAJOR}"
+          # float minor tag during 0.x, where minors may contain breaking changes
+          if [ "$MAJOR" = "0" ]; then
+            float "v0.${MINOR}"
+          fi

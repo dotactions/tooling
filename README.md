@@ -4,7 +4,8 @@ Shared CI for the `dotactions/*` repos: reusable workflows plus the shell test h
 
 | Workflow | Does | Caller job needs |
 | :--- | :--- | :--- |
-| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) forward only. Notes start at the highest stable tag below `version`, or at the optional `previous-tag` input | `RELEASE_APP_PRIVATE_KEY` |
+| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) forward only via `floating-tags.yml`. Notes start at the highest stable tag below `version`, or at the optional `previous-tag` input | `RELEASE_APP_PRIVATE_KEY` |
+| `floating-tags.yml` | Moves `v<major>` (and `v0.<minor>` during `0.x`) to an existing release tag, forward only, never for pre-releases. Called by `release.yml`, and directly by repos released through the GitHub UI | `RELEASE_APP_PRIVATE_KEY` |
 | `check-refs.yml` | Self-references must be `@main`; other repos in the org must be `@<40-char release-tag sha> # vX.Y.Z` | — |
 | `actionlint.yml` | actionlint (pinned image), errors as annotations | — |
 | `lint.yml` | ShellCheck (pinned image) and PSScriptAnalyzer (pinned version) on tracked scripts | — |
@@ -39,6 +40,25 @@ jobs:
     with:
       version: ${{ inputs.version }}
       previous-tag: ${{ inputs.previous-tag }}
+    secrets:
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+```
+
+Repos listed on the GitHub Marketplace release through the UI instead (the "Publish this Action to the GitHub Marketplace" checkbox only exists there), so they have no `internal-release.yml` and must have no `@main` self-references, because nothing rewrites them. Their floating tags move on `release: published`:
+
+```yaml
+# .github/workflows/internal-floating-tags.yml
+name: Floating Tags
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  floating-tags:
+    uses: dotactions/tooling/.github/workflows/floating-tags.yml@<sha> # v1.0.0
+    with:
+      version: ${{ github.event.release.tag_name }}
     secrets:
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 ```
