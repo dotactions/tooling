@@ -48,6 +48,17 @@ done
 new_case
 run "$VALIDATE" GITHUB_REF=refs/heads/feature VERSION=1.0.0
 expect_fail "rejects a branch other than main" "Releases must be cut from main"
+for v in 0.9.0:v0.9.0 v0.9.0:v0.9.0; do
+  new_case
+  run "$VALIDATE" GITHUB_REF=refs/heads/main VERSION=1.0.0 PREVIOUS_TAG="${v%%:*}"
+  expect "previous-tag ${v%%:*} becomes ${v#*:}" "${v#*:}" "$(output previous-tag)"
+done
+new_case
+run "$VALIDATE" GITHUB_REF=refs/heads/main VERSION=1.0.0 PREVIOUS_TAG=main
+expect_fail "rejects a non-semver previous-tag" "previous-tag 'main' is not a valid semver tag"
+new_case
+run "$VALIDATE" GITHUB_REF=refs/heads/main VERSION=1.0.0
+expect "no previous-tag output by default" "" "$(output previous-tag)"
 
 # --- Ensure tag does not exist
 new_case
@@ -57,6 +68,10 @@ run "$EXISTS" "${GITVARS[@]}" VERSION=1.0.0
 expect_fail "existing tag" "Tag v1.0.0 already exists"
 run "$EXISTS" "${GITVARS[@]}" VERSION=1.0.1
 expect_ok "new tag"
+run "$EXISTS" "${GITVARS[@]}" VERSION=1.0.1 PREVIOUS_TAG=v1.0.0
+expect_ok "existing previous-tag"
+run "$EXISTS" "${GITVARS[@]}" VERSION=1.0.1 PREVIOUS_TAG=v0.9.0
+expect_fail "missing previous-tag" "previous-tag v0.9.0 does not exist"
 
 # --- Pin self-references
 SHA=0123456789abcdef0123456789abcdef01234567
@@ -102,12 +117,34 @@ expect "main is untouched" "file" "$(g log -1 --format=%s main)"
 expect "only the tag is pushed" "git push origin v1.2.3" "$(stub_log | grep '^git push')"
 
 # --- Create GitHub release
+gh_call() { stub_log | grep '^gh '; }
 new_case
-run "$RELEASE" VERSION=1.0.0-rc.1 GH_TOKEN=x
-expect "pre-release is marked" "gh release create v1.0.0-rc.1 --verify-tag --generate-notes --title v1.0.0-rc.1 --prerelease" "$(stub_log)"
+repo
+run "$RELEASE" "${GITVARS[@]}" VERSION=1.0.0-rc.1 GH_TOKEN=x
+expect "pre-release is marked" "gh release create v1.0.0-rc.1 --verify-tag --generate-notes --title v1.0.0-rc.1 --prerelease" "$(gh_call)"
 new_case
-run "$RELEASE" VERSION=1.0.0 GH_TOKEN=x
-expect "stable release is not marked" "gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0" "$(stub_log)"
+repo
+run "$RELEASE" "${GITVARS[@]}" VERSION=1.0.0 GH_TOKEN=x
+expect "stable release is not marked" "gh release create v1.0.0 --verify-tag --generate-notes --title v1.0.0" "$(gh_call)"
+
+# Release notes start at the highest stable tag below the new version; floating and pre-release tags never count.
+new_case
+repo
+for t in v0.9.0 v0.10.0 v1.2.0 v1.3.0 v2.0.0-rc.1 v0 v0.10 v1 v1.3; do g tag "$t"; done
+notes_start() {
+  g tag -f "v$1" > /dev/null
+  : > "$CASE_DIR/stubs.log"
+  run "$RELEASE" "${GITVARS[@]}" VERSION="$1" PREVIOUS_TAG="${2:-}" GH_TOKEN=x
+  gh_call | sed -n 's/.*--notes-start-tag \([^ ]*\).*/\1/p'
+  g tag -d "v$1" > /dev/null
+}
+expect "patch starts at previous patch line" "v1.3.0" "$(notes_start 1.3.1)"
+expect "hotfix on an older line skips newer tags" "v1.2.0" "$(notes_start 1.2.1)"
+expect "versions sort numerically, not lexically" "v0.10.0" "$(notes_start 1.0.0)"
+expect "pre-release starts at the last stable" "v1.3.0" "$(notes_start 2.0.0-rc.2)"
+expect "stable after an rc skips the rc" "v1.3.0" "$(notes_start 2.0.0)"
+expect "first release has no start tag" "" "$(notes_start 0.1.0)"
+expect "previous-tag overrides the computed start" "v0.9.0" "$(notes_start 1.3.1 v0.9.0)"
 
 # --- Update floating tags: one repo, a sequence of releases on separate commits
 new_case

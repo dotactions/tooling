@@ -4,7 +4,7 @@ Shared CI for the `dotactions/*` repos: reusable workflows plus the shell test h
 
 | Workflow | Does | Caller job needs |
 | :--- | :--- | :--- |
-| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) forward only | `secrets: inherit` |
+| `release.yml` | Rewrites the caller's `@main` self-references to `@v<version>` in a release commit, tags it, creates the GitHub release, moves `v<major>` (and `v0.<minor>` during `0.x`) forward only. Notes start at the highest stable tag below `version`, or at the optional `previous-tag` input | `RELEASE_APP_PRIVATE_KEY` |
 | `check-refs.yml` | Self-references must be `@main`; other repos in the org must be `@<40-char release-tag sha> # vX.Y.Z` | — |
 | `actionlint.yml` | actionlint (pinned image), errors as annotations | — |
 | `lint.yml` | ShellCheck (pinned image) and PSScriptAnalyzer (pinned version) on tracked scripts | — |
@@ -26,6 +26,10 @@ on:
         description: "Version to release, without leading v (e.g. 1.2.0 or 1.2.0-rc.1)"
         required: true
         type: string
+      previous-tag:
+        description: "Tag to start the release notes from (default: highest stable tag below version)"
+        required: false
+        type: string
 permissions:
   contents: read
 jobs:
@@ -33,7 +37,9 @@ jobs:
     uses: dotactions/tooling/.github/workflows/release.yml@<sha> # v1.0.0
     with:
       version: ${{ inputs.version }}
-    secrets: inherit
+      previous-tag: ${{ inputs.previous-tag }}
+    secrets:
+      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 ```
 
 ```yaml
