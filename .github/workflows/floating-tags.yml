@@ -91,7 +91,8 @@ jobs:
               echo "::notice::Not moving $1: a newer release than v${VERSION} exists ($(highest "$1.*"))"
               return
             fi
-            git tag -fa "$1" -m "Update $1 to v${VERSION}"
+            # Explicit target: this job's checkout is main, not the release commit.
+            git tag -fa "$1" -m "Update $1 to v${VERSION}" "v${VERSION}^{commit}"
             git push origin "$1" --force
           }
 
