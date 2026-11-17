@@ -74,6 +74,10 @@ jobs:
             exit 0
           fi
 
+          # Annotated tags need a committer identity, and this job's fresh checkout has none.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           MAJOR="${VERSION%%.*}"
           REST="${VERSION#*.}"
           MINOR="${REST%%.*}"

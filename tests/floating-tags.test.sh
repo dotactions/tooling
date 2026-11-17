@@ -18,11 +18,11 @@ stub git "if [ \"\$1\" = push ]; then exit 0; fi
 exec \"$REAL_GIT\" \"\$@\""
 
 g() { env "${GITVARS[@]}" "$REAL_GIT" -C "$WORK" "$@"; }
+# Like a fresh runner checkout: no committer identity in the repo, so the step must set its own.
+gi() { g -c user.name=test -c user.email=test@example.com "$@"; }
 repo() {
   g init -q -b main
-  g config user.name test
-  g config user.email test@example.com
-  g commit -q --allow-empty -m init
+  gi commit -q --allow-empty -m init
 }
 at() { g rev-parse -q --verify "$1^{commit}" || true; }
 
@@ -50,8 +50,8 @@ expect "nothing is pushed for a missing tag" "" "$(stub_log | grep '^git push' |
 new_case
 repo
 release() {
-  g commit -q --allow-empty -m "$1"
-  g tag -a "v$1" -m "v$1"
+  gi commit -q --allow-empty -m "$1"
+  gi tag -a "v$1" -m "v$1"
   run "$FLOAT" "${GITVARS[@]}" VERSION="$1"
 }
 release 0.5.0
