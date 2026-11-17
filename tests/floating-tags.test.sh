@@ -52,6 +52,8 @@ repo
 release() {
   gi commit -q --allow-empty -m "$1"
   gi tag -a "v$1" -m "v$1"
+  # HEAD moves past the release tag, like main does after a release (the job checks out main, not the tag).
+  gi commit -q --allow-empty -m "after v$1"
   run "$FLOAT" "${GITVARS[@]}" VERSION="$1"
 }
 release 0.5.0
